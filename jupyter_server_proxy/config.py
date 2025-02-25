@@ -16,6 +16,7 @@ from traitlets import (
     Bool,
     Callable,
     Dict,
+    Float,
     Instance,
     Int,
     List,
@@ -106,8 +107,8 @@ class ServerProcess(Configurable):
     """,
     ).tag(config=True)
 
-    timeout = Int(
-        5, help="Timeout in seconds for the process to become ready, default 5s."
+    timeout = Float(
+        5.0, help="Timeout in seconds for the process to become ready, default 5s."
     ).tag(config=True)
 
     absolute_url = Bool(
@@ -268,6 +269,11 @@ def _make_proxy_handler(sp: ServerProcess):
     """
     Create an appropriate handler with given parameters
     """
+    def execute_action(value):
+        if callable(value):
+            return value()  # Call if it's a function
+        return value  # Otherwise, return its value
+
     if sp.command:
         cls = (
             SuperviseAndRawSocketHandler
@@ -292,29 +298,29 @@ def _make_proxy_handler(sp: ServerProcess):
 
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-            self.name = sp.name
-            self.command = sp.command
-            self.proxy_base = sp.name
-            self.absolute_url = sp.absolute_url
+            self.name = execute_action(sp.name)
+            self.command = execute_action(sp.command)
+            self.proxy_base = execute_action(sp.name)
+            self.absolute_url = execute_action(sp.absolute_url)
             if sp.command:
-                self.requested_port = sp.port
-                self.requested_unix_socket = sp.unix_socket
+                self.requested_port = execute_action(sp.port)
+                self.requested_unix_socket = execute_action(sp.unix_socket)
             else:
-                self.port = sp.port
-                self.unix_socket = sp.unix_socket
-            self.mappath = sp.mappath
-            self.rewrite_response = sp.rewrite_response
-            self.update_last_activity = sp.update_last_activity
+                self.port = execute_action(sp.port)
+                self.unix_socket = execute_action(sp.unix_socket)
+            self.mappath = execute_action(sp.mappath)
+            self.rewrite_response = execute_action(sp.rewrite_response)
+            self.update_last_activity = execute_action(sp.update_last_activity)
 
         def get_request_headers_override(self):
-            return self._realize_rendered_template(sp.request_headers_override)
+            return self._realize_rendered_template(execute_action(sp.request_headers_override))
 
         # these two methods are only used in supervise classes, but do no harm otherwise
         def get_env(self):
-            return self._realize_rendered_template(sp.environment)
+            return self._realize_rendered_template(execute_action(sp.environment))
 
         def get_timeout(self):
-            return sp.timeout
+            return execute_action(sp.timeout)
 
     return _Proxy
 
